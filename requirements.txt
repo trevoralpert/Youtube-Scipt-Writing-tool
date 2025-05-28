@@ -1,6 +1,6 @@
 langchain
 langchain-community
-langchain_openai
+langchain-openai
 openai
 streamlit
 gradio
@@ -8,3 +8,5 @@ tiktoken
 python-dotenv
 pinecone-client
 duckduckgo_search
+python-dotenv
+google-search-results

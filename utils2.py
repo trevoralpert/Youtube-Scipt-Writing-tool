@@ -1,10 +1,34 @@
-from langchain_community.chat_models import ChatOpenAI  # Updated import
+from langchain_openai import ChatOpenAI  # Updated import for LangChain >=0.0.10
 from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain
-from langchain_community.tools import DuckDuckGoSearchRun  # Updated import
+from serpapi import GoogleSearch
+
+# Helper to extract content from LangChain invoke result
+def extract_content(result):
+    if isinstance(result, dict) and "content" in result:
+        return result["content"]
+    elif hasattr(result, "content"):
+        return result.content
+    else:
+        return str(result)
+
+# Function to perform a Google search using SerpAPI
+def serpapi_search(query, serp_api_key):
+    params = {
+        "engine": "google",
+        "q": query,
+        "api_key": serp_api_key
+    }
+    search = GoogleSearch(params)
+    results = search.get_dict()
+    # Extract relevant snippets from results
+    snippets = []
+    for result in results.get("organic_results", []):
+        if "snippet" in result:
+            snippets.append(result["snippet"])
+    return "\n".join(snippets) if snippets else "No search results found."
 
 # Function to generate video script
-def generate_script(prompt, video_length, creativity, api_key):
+def generate_script(prompt, video_length, creativity, openai_api_key, serp_api_key):
     # Template for generating 'Title'
     title_template = PromptTemplate(
         input_variables=['subject'],
@@ -13,28 +37,31 @@ def generate_script(prompt, video_length, creativity, api_key):
 
     # Template for generating 'Video Script' using search engine
     script_template = PromptTemplate(
-        input_variables=['title', 'DuckDuckGo_Search', 'duration'],
+        input_variables=['title', 'Search_Snippets', 'duration'],
         template=(
             'Create a script for a YouTube video based on this title. '
-            'TITLE: {title} of duration {duration} minutes using this search data: {DuckDuckGo_Search}'
+            'TITLE: {title} of duration {duration} minutes using this search data: {Search_Snippets}'
         )
     )
 
     # Setting up OpenAI LLM
-    llm = ChatOpenAI(temperature=creativity, openai_api_key=api_key, model_name='gpt-3.5-turbo')
+    llm = ChatOpenAI(temperature=creativity, openai_api_key=openai_api_key, model_name='gpt-3.5-turbo')
 
-    # Creating chains for 'Title' & 'Video Script'
-    title_chain = LLMChain(llm=llm, prompt=title_template, verbose=True)
-    script_chain = LLMChain(llm=llm, prompt=script_template, verbose=True)
-
-    # DuckDuckGo Search Tool
-    search = DuckDuckGoSearchRun()
+    # RunnableSequences for 'Title' & 'Video Script'
+    title_chain = title_template | llm
+    script_chain = script_template | llm
 
     # Generate Title
-    title = title_chain.run(prompt)
+    title = title_chain.invoke({"subject": prompt})
+    title_text = extract_content(title)
 
-    # Generate Script using DuckDuckGo Search results
-    search_result = search.run(prompt)
-    script = script_chain.run(title=title, DuckDuckGo_Search=search_result, duration=video_length)
+    # Use SerpAPI for search
+    try:
+        search_result = serpapi_search(prompt, serp_api_key)
+    except Exception as e:
+        raise Exception(f"SerpAPI error: {e}")
 
-    return search_result, title, script
+    script = script_chain.invoke({"title": title_text, "Search_Snippets": search_result, "duration": video_length})
+    script_text = extract_content(script)
+
+    return search_result, title_text, script_text

@@ -1,5 +1,14 @@
 import streamlit as st
 from utils2 import generate_script
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Get API keys from environment variables
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+SERPAPI_API_KEY = os.getenv("SERPAPI_API_KEY")
 
 # Applying Styling
 st.markdown("""
@@ -14,15 +23,9 @@ div.stButton > button:hover {
 }
 </style>""", unsafe_allow_html=True)
 
-# Creating Session State Variable
-if 'API_Key' not in st.session_state:
-    st.session_state['API_Key'] = ''
-
 st.title('😎 YouTube Script Writing Tool')
 
-# Sidebar to capture the OpenAI API key
-st.sidebar.title("🗝️")
-st.session_state['API_Key'] = st.sidebar.text_input("What's your API key?", type="password")
+# Sidebar image only
 st.sidebar.image('./Youtube.jpg', use_container_width=True)
 
 # Captures User Inputs
@@ -33,9 +36,9 @@ creativity = st.slider("Creativity Level 🧑‍🎨 - (0 LOW || 1 HIGH)", 0.0, 
 submit = st.button("Generate Script for me")
 
 if submit:
-    if st.session_state['API_Key']:
+    if OPENAI_API_KEY and SERPAPI_API_KEY:
         try:
-            search_result, title, script = generate_script(prompt, video_length, creativity, st.session_state['API_Key'])
+            search_result, title, script = generate_script(prompt, video_length, creativity, OPENAI_API_KEY, SERPAPI_API_KEY)
 
             st.success('Hope you like this script 🥲')
 
@@ -48,10 +51,10 @@ if submit:
             st.write(script)
 
             # Display Search Engine Result
-            st.subheader("Check Out - DuckDuckGo Search: 🔍")
+            st.subheader("Check Out - Google Search: 🔍")
             with st.expander('Show me 👀'):
                 st.info(search_result)
         except Exception as e:
             st.error(f"An error occurred: {e}")
     else:
-        st.error("Oops! Nice try but no free lunch around here 😏 Please provide API key.....")
+        st.error("Please set your OpenAI and SerpAPI keys in the .env file.")
